@@ -63,6 +63,13 @@ def simulate_race():
         # Título de la vuelta
         events.append(f"Iniciando vuelta {lap}.")
 
+        # Mostrar las 5 primeras posiciones y el estado del clima
+        top_5 = standings[:5]
+        print(f"Vuelta {lap}: Top 5 posiciones:")
+        for idx, pilot in enumerate(top_5, start=1):
+            print(f"{idx}. {pilot}")
+        print(f"Clima: {'Lluvia' if is_raining else 'Seco'}")
+
         # Simular entradas a pits (10% de probabilidad por piloto)
         for i, pilot in enumerate(standings):
             if random.random() < 0.1:
@@ -81,9 +88,9 @@ def simulate_race():
         if random.random() < 0.2:
             is_raining = not is_raining
 
-        # Contador visual de 60 segundos
-        for second in range(1, 61):
-            print(f"Vuelta {lap}: {second} segundos transcurridos...")
+        # Contador descendente de 60 segundos
+        for second in range(60, 0, -1):
+            print(f"Vuelta {lap}: {second} segundos restantes...")
             time.sleep(1)
 
         # Duración de la vuelta
@@ -105,4 +112,3 @@ def simulate_race():
         "race_results": race_results,
         "winner": standings[0]
     }
-
