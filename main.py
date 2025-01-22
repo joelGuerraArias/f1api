@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Query
 import random
 import time
+from datetime import datetime
 
 app = FastAPI()
 
@@ -56,6 +57,7 @@ def simulate_race():
     race_results = []
 
     for lap in range(1, 11):
+        start_time = datetime.now()
         events = []
 
         # Título de la vuelta
@@ -72,17 +74,26 @@ def simulate_race():
             standings[pos1], standings[pos2] = standings[pos2], standings[pos1]
             events.append(f"{standings[pos2]} intercambia posición con {standings[pos1]}.")
 
+        # Simular distancia entre pilotos
+        distances = {pilot: round(random.uniform(0.5, 5.0), 2) for pilot in standings}
+
+        # Cambiar la condición climática (20% de probabilidad por vuelta)
+        if random.random() < 0.2:
+            is_raining = not is_raining
+
+        # Duración de la vuelta
+        end_time = datetime.now()
+        duration = (end_time - start_time).total_seconds()
+
         # Guardar los resultados de la vuelta
         race_results.append({
             "lap": lap,
             "raining": is_raining,
             "standings": standings.copy(),
-            "events": events
+            "events": events,
+            "distances": distances,
+            "lap_duration_seconds": duration
         })
-
-        # Cambiar la condición climática (20% de probabilidad por vuelta)
-        if random.random() < 0.2:
-            is_raining = not is_raining
 
         # Esperar 1 minuto entre vueltas
         time.sleep(60)
@@ -101,6 +112,8 @@ def simulate_lap(current_standings: str = Query(..., description="Posiciones act
     """
     global is_raining
 
+    start_time = datetime.now()
+
     # Verifica y convierte el parámetro de posiciones actuales
     try:
         standings = current_standings.split(",")  # Divide la cadena en una lista
@@ -111,8 +124,7 @@ def simulate_lap(current_standings: str = Query(..., description="Posiciones act
     events = []
 
     # Título de la vuelta
-    lap_number = len(events) + 1
-    events.append(f"Iniciando vuelta {lap_number}.")
+    events.append("Simulando vuelta única.")
 
     # Simular entradas a pits (10% de probabilidad por piloto)
     for i, pilot in enumerate(standings):
@@ -125,9 +137,16 @@ def simulate_lap(current_standings: str = Query(..., description="Posiciones act
         standings[pos1], standings[pos2] = standings[pos2], standings[pos1]
         events.append(f"{standings[pos2]} intercambia posición con {standings[pos1]}.")
 
+    # Simular distancia entre pilotos
+    distances = {pilot: round(random.uniform(0.5, 5.0), 2) for pilot in standings}
+
     # Cambiar la condición climática (20% de probabilidad por vuelta)
     if random.random() < 0.2:
         is_raining = not is_raining
+
+    # Duración de la vuelta
+    end_time = datetime.now()
+    duration = (end_time - start_time).total_seconds()
 
     # Esperar 1 minuto entre simulaciones
     time.sleep(60)
@@ -135,5 +154,7 @@ def simulate_lap(current_standings: str = Query(..., description="Posiciones act
     return {
         "standings": standings,
         "raining": is_raining,
-        "events": events
+        "events": events,
+        "distances": distances,
+        "lap_duration_seconds": duration
     }
