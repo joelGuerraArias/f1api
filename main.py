@@ -58,6 +58,9 @@ def simulate_race():
     for lap in range(1, 11):
         events = []
 
+        # Título de la vuelta
+        events.append(f"Iniciando vuelta {lap}.")
+
         # Simular entradas a pits (10% de probabilidad por piloto)
         for i, pilot in enumerate(standings):
             if random.random() < 0.1:
@@ -106,6 +109,10 @@ def simulate_lap(current_standings: str = Query(..., description="Posiciones act
         return {"error": f"Error al procesar las posiciones actuales: {str(e)}"}
 
     events = []
+
+    # Título de la vuelta
+    lap_number = len(events) + 1
+    events.append(f"Iniciando vuelta {lap_number}.")
 
     # Simular entradas a pits (10% de probabilidad por piloto)
     for i, pilot in enumerate(standings):
