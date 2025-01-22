@@ -3,7 +3,7 @@ import random
 
 app = FastAPI()
 
-# Lista de pilotos de ejemplo (actualízala con los de 2025)
+# Lista de pilotos de ejemplo (puedes actualizarla con los de 2025)
 pilots = [
     "Max Verstappen",
     "Charles Leclerc",
@@ -87,14 +87,21 @@ def simulate_race():
     }
 
 @app.get("/simulate_lap")
-def simulate_lap(current_standings: list[str] = Query(..., description="Posiciones actuales de los pilotos.")):
-    """Simular una sola vuelta."""
+def simulate_lap(current_standings: str = Query(..., description="Posiciones actuales de los pilotos como una lista separada por comas.")):
+    """
+    Simular una sola vuelta.
+    Recibe las posiciones actuales de los pilotos como una cadena separada por comas (ejemplo: "Max Verstappen,Charles Leclerc,Lewis Hamilton").
+    """
     global is_raining
 
-    events = []
+    # Verifica y convierte el parámetro de posiciones actuales
+    try:
+        standings = current_standings.split(",")  # Divide la cadena en una lista
+        standings = [pilot.strip() for pilot in standings]  # Elimina espacios adicionales
+    except Exception as e:
+        return {"error": f"Error al procesar las posiciones actuales: {str(e)}"}
 
-    # Convertir las posiciones actuales a una lista mutable
-    standings = current_standings.copy()
+    events = []
 
     # Simular entradas a pits (10% de probabilidad por piloto)
     for i, pilot in enumerate(standings):
