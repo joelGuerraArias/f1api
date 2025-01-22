@@ -5,28 +5,28 @@ from datetime import datetime
 
 app = FastAPI()
 
-# Lista de pilotos de ejemplo (actualízala con los de 2025)
+# Lista de pilotos y equipos para la temporada 2025
 pilots = [
-    "Max Verstappen",
-    "Charles Leclerc",
-    "Lewis Hamilton",
-    "Fernando Alonso",
-    "Lando Norris",
-    "Sergio Pérez",
-    "Carlos Sainz",
-    "George Russell",
-    "Oscar Piastri",
-    "Esteban Ocon",
-    "Pierre Gasly",
-    "Yuki Tsunoda",
-    "Daniel Ricciardo",
-    "Kevin Magnussen",
-    "Nico Hülkenberg",
-    "Valtteri Bottas",
-    "Zhou Guanyu",
-    "Alexander Albon",
-    "Logan Sargeant",
-    "Liam Lawson"
+    "George Russell (Mercedes)",
+    "Andrea Kimi Antonelli (Mercedes)",
+    "Max Verstappen (Red Bull)",
+    "Liam Lawson (Red Bull)",
+    "Lando Norris (McLaren)",
+    "Oscar Piastri (McLaren)",
+    "Fernando Alonso (Aston Martin)",
+    "Lance Stroll (Aston Martin)",
+    "Pierre Gasly (Alpine)",
+    "Jack Doohan (Alpine)",
+    "Charles Leclerc (Ferrari)",
+    "Lewis Hamilton (Ferrari)",
+    "Yuki Tsunoda (Racing Bulls)",
+    "Isack Hadjar (Racing Bulls)",
+    "Nico Hülkenberg (Sauber)",
+    "Gabriel Bortoleto (Sauber)",
+    "Oliver Bearman (Haas)",
+    "Esteban Ocon (Haas)",
+    "Alex Albon (Williams)",
+    "Carlos Sainz (Williams)"
 ]
 
 # Variable global para la condición climática
@@ -46,7 +46,7 @@ def set_weather(raining: bool = Query(..., description="Indica si está lloviend
 
 @app.get("/simulate_race")
 def simulate_race():
-    """Simular una carrera completa de 10 vueltas."""
+    """Simular una carrera completa de 10 vueltas con contador de tiempo."""
     global is_raining
 
     # Orden inicial de los pilotos
@@ -81,6 +81,11 @@ def simulate_race():
         if random.random() < 0.2:
             is_raining = not is_raining
 
+        # Contador visual de 60 segundos
+        for second in range(1, 61):
+            print(f"Vuelta {lap}: {second} segundos transcurridos...")
+            time.sleep(1)
+
         # Duración de la vuelta
         end_time = datetime.now()
         duration = (end_time - start_time).total_seconds()
@@ -95,66 +100,9 @@ def simulate_race():
             "lap_duration_seconds": duration
         })
 
-        # Esperar 1 minuto entre vueltas
-        time.sleep(60)
-
     # Resultado final
     return {
         "race_results": race_results,
         "winner": standings[0]
     }
 
-@app.get("/simulate_lap")
-def simulate_lap(current_standings: str = Query(..., description="Posiciones actuales de los pilotos como una lista separada por comas.")):
-    """
-    Simular una sola vuelta.
-    Recibe las posiciones actuales de los pilotos como una cadena separada por comas (ejemplo: "Max Verstappen,Charles Leclerc,Lewis Hamilton").
-    """
-    global is_raining
-
-    start_time = datetime.now()
-
-    # Verifica y convierte el parámetro de posiciones actuales
-    try:
-        standings = current_standings.split(",")  # Divide la cadena en una lista
-        standings = [pilot.strip() for pilot in standings]  # Elimina espacios adicionales
-    except Exception as e:
-        return {"error": f"Error al procesar las posiciones actuales: {str(e)}"}
-
-    events = []
-
-    # Título de la vuelta
-    events.append("Simulando vuelta única.")
-
-    # Simular entradas a pits (10% de probabilidad por piloto)
-    for i, pilot in enumerate(standings):
-        if random.random() < 0.1:
-            events.append(f"{pilot} entra a pits.")
-
-    # Cambios de posición aleatorios
-    if random.random() < 0.3:  # 30% de probabilidad de cambio de posiciones
-        pos1, pos2 = random.sample(range(len(standings)), 2)
-        standings[pos1], standings[pos2] = standings[pos2], standings[pos1]
-        events.append(f"{standings[pos2]} intercambia posición con {standings[pos1]}.")
-
-    # Simular distancia entre pilotos
-    distances = {pilot: round(random.uniform(0.5, 5.0), 2) for pilot in standings}
-
-    # Cambiar la condición climática (20% de probabilidad por vuelta)
-    if random.random() < 0.2:
-        is_raining = not is_raining
-
-    # Duración de la vuelta
-    end_time = datetime.now()
-    duration = (end_time - start_time).total_seconds()
-
-    # Esperar 1 minuto entre simulaciones
-    time.sleep(60)
-
-    return {
-        "standings": standings,
-        "raining": is_raining,
-        "events": events,
-        "distances": distances,
-        "lap_duration_seconds": duration
-    }
