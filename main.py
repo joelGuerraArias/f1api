@@ -1,9 +1,10 @@
 from fastapi import FastAPI, Query
 import random
+import time
 
 app = FastAPI()
 
-# Lista de pilotos de ejemplo (puedes actualizarla con los de 2025)
+# Lista de pilotos de ejemplo (actualízala con los de 2025)
 pilots = [
     "Max Verstappen",
     "Charles Leclerc",
@@ -80,6 +81,9 @@ def simulate_race():
         if random.random() < 0.2:
             is_raining = not is_raining
 
+        # Esperar 1 minuto entre vueltas
+        time.sleep(60)
+
     # Resultado final
     return {
         "race_results": race_results,
@@ -117,6 +121,9 @@ def simulate_lap(current_standings: str = Query(..., description="Posiciones act
     # Cambiar la condición climática (20% de probabilidad por vuelta)
     if random.random() < 0.2:
         is_raining = not is_raining
+
+    # Esperar 1 minuto entre simulaciones
+    time.sleep(60)
 
     return {
         "standings": standings,
