@@ -142,6 +142,3 @@ async def full_race_simulation():
             "X-Accel-Buffering": "no"
         }
     )
-
-
-
