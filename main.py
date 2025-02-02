@@ -86,7 +86,7 @@ async def full_race_simulation():
 
                 # Solo cambiar las primeras 3 posiciones
                 if not safety_car:
-                    positions = list(range(3))  # Solo los primeros 3
+                    positions = [0, 1, 2]  # Solo los primeros 3
                     random.shuffle(positions)
                     standings[positions[0]], standings[positions[1]] = standings[positions[1]], standings[positions[0]]
                     events.append(f"🔄 Cambio en el top 3: {standings[0]} ahora lidera la carrera")
@@ -115,15 +115,16 @@ async def full_race_simulation():
                 else:
                     formatted_output += "\nSin eventos destacados\n"
 
-                formatted_output += f"\nPróxima actualización en: {60 - (time.time() - lap_start):.1f}s"
-                formatted_output += "\n" + "-" * 50
+                formatted_output += "\n--------------------------------------------------\n"
 
                 # Enviar la respuesta formateada como un evento SSE
                 yield f"data: {json.dumps({'message': formatted_output})}\n\n"
 
-                # Esperar 60 segundos antes de la próxima vuelta
-                elapsed = time.time() - lap_start
-                await asyncio.sleep(max(60 - elapsed, 0))
+                # Contador regresivo de 60 segundos
+                for i in range(60, 0, -1):
+                    countdown_message = f"data: {json.dumps({'message': f'⏳ Próxima vuelta en {i} segundos'})}\n\n"
+                    yield countdown_message
+                    await asyncio.sleep(1)  # Espera 1 segundo por iteración
 
         except Exception as e:
             logger.error(f"Error en generador: {str(e)}")
@@ -141,5 +142,6 @@ async def full_race_simulation():
             "X-Accel-Buffering": "no"
         }
     )
+
 
 
