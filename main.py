@@ -45,11 +45,11 @@ def handle_safety_car(current_status: bool, events: List[str]) -> bool:
     """Gestiona la lógica del Safety Car"""
     if current_status:
         if random.random() < 0.3:  # 30% de probabilidad de retirarlo
-            events.append("Safety Car entra a boxes")
+            events.append("🚨 Safety Car entra a boxes")
             return False
     else:
         if random.random() < 0.15:  # 15% de probabilidad de activarlo
-            events.append("Safety Car despliega")
+            events.append("🚨 Safety Car despliega en la pista")
             return True
     return current_status
 
@@ -61,7 +61,7 @@ def process_pit_stops(standings: List[str], events: List[str], safety_car_active
                 driver = standings[i]
                 new_pos = random.randint(5, len(standings)-1)
                 standings.insert(new_pos, standings.pop(i))
-                events.append(f"{driver} entra a pits (P{i+1} → P{new_pos+1})")
+                events.append(f"🛠️ {driver} entra a pits (P{i+1} → P{new_pos+1})")
 
 @app.get("/drivers")
 def get_drivers():
@@ -83,6 +83,7 @@ async def full_race_simulation():
             random.shuffle(standings)
             local_weather = weather["raining"]
             safety_car = safety_car_status["active"]
+            start_time = time.time()
             
             for lap in range(1, 11):
                 lap_start = time.time()
@@ -91,7 +92,7 @@ async def full_race_simulation():
                 # Cambio de clima
                 if random.random() < 0.2:
                     local_weather = not local_weather
-                    events.append(f"Cambio de clima a {'lluvia' if local_weather else 'seco'}")
+                    events.append(f"🌦️ Cambio de clima a {'lluvia' if local_weather else 'seco'}")
                 
                 # Safety Car
                 safety_car = handle_safety_car(safety_car, events)
@@ -100,24 +101,37 @@ async def full_race_simulation():
                 if not safety_car and random.random() < 0.3:
                     pos1, pos2 = random.sample(range(10), 2)
                     standings[pos1], standings[pos2] = standings[pos2], standings[pos1]
-                    events.append(f"Cambio de posición: P{pos1+1} ↔ P{pos2+1}")
+                    events.append(f"🔄 Cambio de posición: P{pos1+1} ↔ P{pos2+1}")
                 
                 # Entradas a pits
                 process_pit_stops(standings, events, safety_car)
                 
-                # Construir payload
-                payload = {
-                    "lap": lap,
-                    "standings": standings[:10],
-                    "raining": local_weather,
-                    "safety_car": safety_car,
-                    "events": events,
-                    "next_update": f"{60 - (time.time() - lap_start):.1f}s",
-                    "timestamp": datetime.utcnow().isoformat() + "Z"
-                }
+                # Formato mejorado para salida
+                formatted_output = (
+                    f"\n=== Vuelta {lap} ===\n"
+                    f"⏱️  Tiempo desde inicio: {time.time() - start_time:.1f}s\n"
+                    f"🌦️  Clima: {'Lluvia' if local_weather else 'Seco'}\n"
+                    f"🚨 Safety Car: {'ACTIVO' if safety_car else 'INACTIVO'}\n\n"
+                    f"Top 3:\n"
+                )
+
+                for i, driver in enumerate(standings[:3], 1):
+                    team = driver.split('(')[1].replace(')', '')
+                    formatted_output += f"P{i}: {driver.split('(')[0].strip()} ({team})\n"
                 
-                # Formato SSE correcto
-                yield f"data: {json.dumps(payload)}\n\n"
+                # Eventos
+                if events:
+                    formatted_output += "\nEventos:\n"
+                    for event in events:
+                        formatted_output += f"• {event}\n"
+                else:
+                    formatted_output += "\nSin eventos destacados\n"
+                
+                formatted_output += f"\nPróxima actualización en: {60 - (time.time() - lap_start):.1f}s"
+                formatted_output += "\n" + "-" * 50
+                
+                # Enviar la respuesta formateada como un evento SSE
+                yield f"data: {json.dumps({'message': formatted_output})}\n\n"
                 
                 # Espera precisa
                 elapsed = time.time() - lap_start
@@ -140,37 +154,12 @@ async def full_race_simulation():
         }
     )
 
-@app.get("/simulate_live")
-async def live_race_preview():
-    """Versión rápida para pruebas (1 vuelta/segundo)"""
-    async def quick_generator():
-        standings = PILOTS.copy()
-        random.shuffle(standings)
-        
-        for lap in range(1, 11):
-            # Lógica simplificada
-            events = []
-            if random.random() < 0.2:
-                events.append("Evento rápido de prueba")
-                
-            yield {
-                "lap": lap,
-                "standings": standings[:10],
-                "events": events,
-                "timestamp": datetime.utcnow().isoformat() + "Z"
-            }
-            await asyncio.sleep(1)
-            
-    return StreamingResponse(
-        quick_generator(),
-        media_type="application/x-ndjson"
-    )
-
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
         app,
         host="0.0.0.0",
-        port=int(os.getenv("PORT", "8000")),
+        port=8000,
         timeout_keep_alive=300
     )
+
