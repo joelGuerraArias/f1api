@@ -4,7 +4,6 @@ import random
 import asyncio
 import time
 import logging
-from datetime import datetime
 import json
 
 # Configuración inicial
@@ -115,12 +114,13 @@ async def full_race_simulation():
                 else:
                     formatted_output += "\nSin eventos destacados\n"
 
-                formatted_output += "\n--------------------------------------------------\n"
+                formatted_output += f"\nPróxima actualización en: 60.0s"
+                formatted_output += "\n" + "-" * 50
 
                 # Enviar la respuesta formateada como un evento SSE
                 yield f"data: {json.dumps({'message': formatted_output})}\n\n"
 
-                # Contador regresivo de 60 segundos
+                # Contador regresivo de 60 segundos antes de la siguiente vuelta
                 for i in range(60, 0, -1):
                     countdown_message = f"data: {json.dumps({'message': f'⏳ Próxima vuelta en {i} segundos'})}\n\n"
                     yield countdown_message
