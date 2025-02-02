@@ -1,3 +1,4 @@
+import json  # 👈 Asegúrate de que esta línea esté presente
 from fastapi import FastAPI, Query
 from fastapi.responses import StreamingResponse
 import random
@@ -6,6 +7,7 @@ import time
 import logging
 from datetime import datetime
 from typing import List
+
 
 # Configuración inicial
 app = FastAPI()
