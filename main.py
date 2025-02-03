@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Query
 from fastapi.responses import StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
 import random
 import asyncio
 import time
@@ -10,6 +11,15 @@ import json
 app = FastAPI()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("F1-API")
+
+# Habilitar CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 🔹 Cambia "*" por ["https://tu-dominio.com"] en producción
+    allow_credentials=True,
+    allow_methods=["*"],  # 🔹 Permite todos los métodos (GET, POST, etc.)
+    allow_headers=["*"],  # 🔹 Permite todos los headers
+)
 
 # Lista de pilotos 2025
 PILOTS = [
@@ -142,3 +152,4 @@ async def full_race_simulation():
             "X-Accel-Buffering": "no"
         }
     )
+
