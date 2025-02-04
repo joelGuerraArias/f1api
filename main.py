@@ -1,41 +1,40 @@
-import os
+from fastapi import FastAPI, Query
+from fastapi.responses import StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
 import openai
 import wikipediaapi
 import random
 import asyncio
 import time
-import logging
+import os
 import json
-from fastapi import FastAPI, Query
-from fastapi.responses import StreamingResponse
-from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
-# Cargar variables de entorno
+# 🔹 Cargar variables de entorno
 load_dotenv()
 
-# Configurar OpenAI
+# 🔹 Obtener clave de OpenAI
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
 if not OPENAI_API_KEY:
     raise ValueError("❌ ERROR: No se encontró la clave de OpenAI. Verifica las variables de entorno en Railway.")
 
+# 🔹 Configuración de OpenAI
 openai.api_key = OPENAI_API_KEY
 
-# Configuración inicial
+# 🔹 Inicialización de la API
 app = FastAPI()
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("F1-API")
 
-# Habilitar CORS
+# 🔹 Configurar CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 🔹 Cambia "*" por ["https://tu-dominio.com"] en producción
+    allow_origins=["*"],  # Cambia "*" por tu dominio en producción
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Lista de pilotos 2025
+# 🔹 Lista de pilotos 2025
 PILOTS = [
     "George Russell (Mercedes)",
     "Andrea Kimi Antonelli (Mercedes)",
@@ -59,59 +58,63 @@ PILOTS = [
     "Carlos Sainz (Williams)"
 ]
 
-# Estado global
+# 🔹 Estado global
 weather = {"raining": False}
 safety_car_status = {"active": False}
 
+# 🔹 Función para manejar el Safety Car
 def handle_safety_car(current_status, events):
-    """Gestiona la lógica del Safety Car"""
     if current_status:
-        if random.random() < 0.3:  # 30% de probabilidad de retirarlo
+        if random.random() < 0.3:
             events.append("🚨 Safety Car entra a boxes")
             return False
     else:
-        if random.random() < 0.15:  # 15% de probabilidad de activarlo
+        if random.random() < 0.15:
             events.append("🚨 Safety Car despliega en la pista")
             return True
     return current_status
 
+# 🔹 Función para manejar pits
 def process_pit_stops(standings, events):
-    """Maneja las entradas a pits"""
     for i in range(len(standings)):
-        if random.random() < 0.1:  # 10% de probabilidad por piloto
+        if random.random() < 0.1:
             driver = standings[i]
             new_pos = random.randint(5, len(standings)-1)
             standings.insert(new_pos, standings.pop(i))
             events.append(f"🛠️ {driver} entra a pits (P{i+1} → P{new_pos+1})")
 
-def fetch_pilot_info(pilot_name):
-    """Obtiene un dato curioso de Wikipedia sobre el piloto"""
-    wiki_wiki = wikipediaapi.Wikipedia('es')  # Wikipedia en español
-    page = wiki_wiki.page(pilot_name.split(" ")[0])  # Buscar solo el primer nombre del piloto
-    if page.exists():
-        summary = page.summary.split(".")[0] + "."  # Solo la primera oración
-        return summary
-    return f"No se encontró información sobre {pilot_name} en Wikipedia."
-
-async def generate_comment(previous_standings, new_standings):
-    """Genera un comentario usando OpenAI basado en los cambios de carrera"""
-    prompt = f"""Basado en la Fórmula 1, genera un comentario sobre la carrera.
-    La vuelta anterior tenía este Top 3: {previous_standings}
-    Ahora el Top 3 es: {new_standings}.
-    Analiza los cambios y genera un comentario en español:
+# 🔹 Función para generar un comentario con OpenAI
+def generate_commentary(lap, top_3, raining):
+    prompt = f"""
+    Genera un comentario en español sobre la vuelta {lap} en una carrera de F1.
+    El clima es {'lluvia' if raining else 'seco'}. 
+    Los tres primeros lugares son:
+    1. {top_3[0]}
+    2. {top_3[1]}
+    3. {top_3[2]}
+    Menciona un dato interesante sobre la carrera sin repetir información básica.
     """
-    
-    response = openai.Completion.create(
-        model="gpt-3.5-turbo",
-        prompt=prompt,
-        max_tokens=50
-    )
-    
-    return response["choices"][0]["text"].strip()
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[{"role": "system", "content": prompt}]
+        )
+        return response["choices"][0]["message"]["content"]
+    except Exception as e:
+        return "🔹 No se pudo generar un comentario para esta vuelta."
+
+# 🔹 Función para obtener un dato curioso de Wikipedia
+def get_pilot_fact(driver):
+    wiki = wikipediaapi.Wikipedia("es")  # Wikipedia en español
+    pilot_name = driver.split("(")[0].strip()
+    page = wiki.page(pilot_name)
+    if page.exists():
+        return f"📌 Dato curioso: {page.summary[:200]}..."
+    return ""
 
 @app.get("/simulate_race")
 async def full_race_simulation():
-    """Simulación de carrera con 5 vueltas y cambios en las primeras 3 posiciones"""
+    """Simulación de carrera con comentarios AI y datos curiosos"""
     async def race_generator():
         try:
             standings = PILOTS.copy()
@@ -119,7 +122,6 @@ async def full_race_simulation():
             local_weather = weather["raining"]
             safety_car = safety_car_status["active"]
             start_time = time.time()
-            previous_standings = []
 
             for lap in range(1, 6):  # 5 vueltas
                 lap_start = time.time()
@@ -134,9 +136,8 @@ async def full_race_simulation():
                 safety_car = handle_safety_car(safety_car, events)
 
                 # Solo cambiar las primeras 3 posiciones
-                previous_standings = standings[:3]  # Guardar la vuelta anterior
                 if not safety_car:
-                    positions = [0, 1, 2]  # Solo los primeros 3
+                    positions = [0, 1, 2]
                     random.shuffle(positions)
                     standings[positions[0]], standings[positions[1]] = standings[positions[1]], standings[positions[0]]
                     events.append(f"🔄 Cambio en el top 3: {standings[0]} ahora lidera la carrera")
@@ -144,11 +145,9 @@ async def full_race_simulation():
                 # Manejo de pits
                 process_pit_stops(standings, events)
 
-                # Obtener comentario generado por OpenAI
-                comment = await generate_comment(previous_standings, standings[:3])
-
-                # Obtener dato curioso de Wikipedia sobre el líder
-                pilot_info = fetch_pilot_info(standings[0])
+                # Generar comentario AI y dato curioso
+                commentary = generate_commentary(lap, standings[:3], local_weather)
+                fact = get_pilot_fact(standings[0])
 
                 # Construcción del mensaje de salida
                 formatted_output = (
@@ -163,22 +162,23 @@ async def full_race_simulation():
                     team = driver.split('(')[1].replace(')', '')
                     formatted_output += f"P{i}: {driver.split('(')[0].strip()} ({team})\n"
 
-                # Comentario generado por OpenAI
-                formatted_output += f"\n🗣️ Comentario: {comment}\n"
+                # Eventos de la vuelta
+                formatted_output += "\nEventos:\n" + "\n".join(f"• {event}" for event in events) if events else "\nSin eventos destacados\n"
 
-                # Dato curioso de Wikipedia
-                formatted_output += f"\n📌 Dato Curioso: {pilot_info}\n"
+                # Comentario y dato curioso
+                formatted_output += f"\n📢 {commentary}\n{fact}\n"
+                formatted_output += f"\nPróxima actualización en: 60.0s\n" + "-" * 50
 
-                # Enviar la respuesta formateada como un evento SSE
                 yield f"data: {json.dumps({'message': formatted_output})}\n\n"
 
-                # Contador regresivo (una sola línea actualizando)
+                # Contador regresivo (actualiza en la misma línea)
                 for i in range(60, 0, -1):
-                    yield f"data: {json.dumps({'message': f'⏳ Próxima vuelta en {i} segundos'})}\n\n"
+                    countdown_message = f"data: {json.dumps({'message': f'⏳ Próxima vuelta en {i} segundos'})}\n\n"
+                    yield countdown_message
                     await asyncio.sleep(1)
 
         except Exception as e:
-            logger.error(f"Error en generador: {str(e)}")
             yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
 
     return StreamingResponse(race_generator(), media_type="text/event-stream")
+
