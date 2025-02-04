@@ -15,10 +15,10 @@ logger = logging.getLogger("F1-API")
 # Habilitar CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 🔹 Cambia "*" por ["https://tu-dominio.com"] en producción
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  # 🔹 Permite todos los métodos (GET, POST, etc.)
-    allow_headers=["*"],  # 🔹 Permite todos los headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Lista de pilotos 2025
@@ -52,11 +52,11 @@ safety_car_status = {"active": False}
 def handle_safety_car(current_status, events):
     """Gestiona la lógica del Safety Car"""
     if current_status:
-        if random.random() < 0.3:  # 30% de probabilidad de retirarlo
+        if random.random() < 0.3:
             events.append("🚨 Safety Car entra a boxes")
             return False
     else:
-        if random.random() < 0.15:  # 15% de probabilidad de activarlo
+        if random.random() < 0.15:
             events.append("🚨 Safety Car despliega en la pista")
             return True
     return current_status
@@ -64,7 +64,7 @@ def handle_safety_car(current_status, events):
 def process_pit_stops(standings, events):
     """Maneja las entradas a pits"""
     for i in range(len(standings)):
-        if random.random() < 0.1:  # 10% de probabilidad por piloto
+        if random.random() < 0.1:
             driver = standings[i]
             new_pos = random.randint(5, len(standings)-1)
             standings.insert(new_pos, standings.pop(i))
@@ -72,7 +72,7 @@ def process_pit_stops(standings, events):
 
 @app.get("/simulate_race")
 async def full_race_simulation():
-    """Simulación de carrera con 5 vueltas y cambios en las primeras 3 posiciones"""
+    """Simulación de carrera con 5 vueltas y conteo regresivo en una sola línea"""
     async def race_generator():
         try:
             standings = PILOTS.copy()
@@ -81,7 +81,7 @@ async def full_race_simulation():
             safety_car = safety_car_status["active"]
             start_time = time.time()
 
-            for lap in range(1, 6):  # 5 vueltas
+            for lap in range(1, 6):
                 lap_start = time.time()
                 events = []
 
@@ -95,7 +95,7 @@ async def full_race_simulation():
 
                 # Solo cambiar las primeras 3 posiciones
                 if not safety_car:
-                    positions = [0, 1, 2]  # Solo los primeros 3
+                    positions = [0, 1, 2]
                     random.shuffle(positions)
                     standings[positions[0]], standings[positions[1]] = standings[positions[1]], standings[positions[0]]
                     events.append(f"🔄 Cambio en el top 3: {standings[0]} ahora lidera la carrera")
@@ -124,17 +124,16 @@ async def full_race_simulation():
                 else:
                     formatted_output += "\nSin eventos destacados\n"
 
-                formatted_output += f"\nPróxima actualización en: 60.0s"
                 formatted_output += "\n" + "-" * 50
 
-                # Enviar la respuesta formateada como un evento SSE
+                # Enviar la información de la vuelta
                 yield f"data: {json.dumps({'message': formatted_output})}\n\n"
 
-                # Contador regresivo de 60 segundos antes de la siguiente vuelta
+                # Contador regresivo en UNA SOLA LÍNEA
                 for i in range(60, 0, -1):
-                    countdown_message = f"data: {json.dumps({'message': f'⏳ Próxima vuelta en {i} segundos'})}\n\n"
-                    yield countdown_message
-                    await asyncio.sleep(1)  # Espera 1 segundo por iteración
+                    countdown_message = f"\r⏳ Próxima vuelta en {i} segundos"
+                    yield f"data: {json.dumps({'message': countdown_message})}\n\n"
+                    await asyncio.sleep(1)
 
         except Exception as e:
             logger.error(f"Error en generador: {str(e)}")
@@ -152,4 +151,5 @@ async def full_race_simulation():
             "X-Accel-Buffering": "no"
         }
     )
+
 
