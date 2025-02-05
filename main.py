@@ -15,20 +15,19 @@ load_dotenv()
 
 # 🔹 Obtener clave de OpenAI
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-
 if not OPENAI_API_KEY:
     raise ValueError("❌ ERROR: No se encontró la clave de OpenAI. Verifica las variables de entorno en Railway.")
 
 # 🔹 Configuración de OpenAI
 openai.api_key = OPENAI_API_KEY
 
-# 🔹 Inicialización de la API
+# 🔹 Inicialización de la API FastAPI
 app = FastAPI()
 
-# 🔹 Configurar CORS
+# 🔹 Configurar CORS (ajusta para producción)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Cambia "*" por tu dominio en producción
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -86,32 +85,40 @@ def process_pit_stops(standings, events):
 # 🔹 Función para generar un comentario con OpenAI
 def generate_commentary(lap, top_3, raining):
     prompt = f"""
-    Genera un comentario en español sobre la vuelta {lap} en una carrera de F1.
-    El clima es {'lluvia' if raining else 'seco'}. 
-    Los tres primeros lugares son:
-    1. {top_3[0]}
-    2. {top_3[1]}
-    3. {top_3[2]}
-    Menciona un dato interesante sobre la carrera sin repetir información básica.
+Genera un comentario en español sobre la vuelta {lap} en una carrera de F1.
+El clima es {'lluvia' if raining else 'seco'}.
+Los tres primeros lugares son:
+1. {top_3[0]}
+2. {top_3[1]}
+3. {top_3[2]}
+Menciona un dato interesante sobre la carrera sin repetir información básica.
     """
     try:
         response = openai.ChatCompletion.create(
             model="gpt-4",
-            messages=[{"role": "system", "content": prompt}]
+            messages=[{"role": "user", "content": prompt}]
         )
         return response["choices"][0]["message"]["content"]
     except Exception as e:
-        return "🔹 No se pudo generar un comentario para esta vuelta."
+        # Imprime el error para facilitar la depuración
+        print("Error generando comentario:", e)
+        return "No se pudo generar un comentario para esta vuelta."
 
 # 🔹 Función para obtener un dato curioso de Wikipedia
 def get_pilot_fact(driver):
-    # Se especifica el User-Agent y el lenguaje conforme a la política de Wikipedia.
     wiki = wikipediaapi.Wikipedia(language="es", user_agent="F1RaceSim/1.0 (autosemana@gmail.com)")
     pilot_name = driver.split("(")[0].strip()
     page = wiki.page(pilot_name)
     if page.exists():
-        return f"📌 Dato curioso: {page.summary[:200]}..."
-    return ""
+        # Verifica si el resumen sugiere una página de desambiguación
+        if "puede referirse a" in page.summary:
+            return f"📌 No se encontró un dato específico para {pilot_name}. La página parece ser de desambiguación."
+        else:
+            summary = page.summary
+            if len(summary) > 500:
+                summary = summary[:500] + "..."
+            return f"📌 Dato curioso: {summary}"
+    return f"📌 No se encontró información para {pilot_name} en Wikipedia."
 
 @app.get("/simulate_race")
 async def full_race_simulation():
@@ -124,8 +131,7 @@ async def full_race_simulation():
             safety_car = safety_car_status["active"]
             start_time = time.time()
 
-            for lap in range(1, 6):  # 5 vueltas
-                lap_start = time.time()
+            for lap in range(1, 6):  # Simula 5 vueltas
                 events = []
 
                 # Cambio de clima con 20% de probabilidad
@@ -136,7 +142,7 @@ async def full_race_simulation():
                 # Manejo del Safety Car
                 safety_car = handle_safety_car(safety_car, events)
 
-                # Solo cambiar las primeras 3 posiciones
+                # Cambiar posiciones en el top 3 solo si no hay Safety Car
                 if not safety_car:
                     positions = [0, 1, 2]
                     random.shuffle(positions)
@@ -146,7 +152,7 @@ async def full_race_simulation():
                 # Manejo de pits
                 process_pit_stops(standings, events)
 
-                # Generar comentario AI y dato curioso
+                # Generar comentario AI y obtener dato curioso de Wikipedia
                 commentary = generate_commentary(lap, standings[:3], local_weather)
                 fact = get_pilot_fact(standings[0])
 
@@ -163,28 +169,24 @@ async def full_race_simulation():
                     team = driver.split('(')[1].replace(')', '')
                     formatted_output += f"P{i}: {driver.split('(')[0].strip()} ({team})\n"
 
-                # Eventos de la vuelta
-                formatted_output += "\nEventos:\n" + "\n".join(f"• {event}" for event in events) if events else "\nSin eventos destacados\n"
+                if events:
+                    formatted_output += "\nEventos:\n" + "\n".join(f"• {event}" for event in events)
+                else:
+                    formatted_output += "\nSin eventos destacados\n"
 
-                # Comentario y dato curioso
                 formatted_output += f"\n📢 {commentary}\n{fact}\n"
                 formatted_output += f"\nPróxima actualización en: 60.0s\n" + "-" * 50
 
                 yield f"data: {json.dumps({'message': formatted_output})}\n\n"
 
-                # Contador regresivo (actualiza en la misma línea)
+                # Contador regresivo: envía un mensaje cada segundo
                 for i in range(60, 0, -1):
                     countdown_message = f"data: {json.dumps({'message': f'⏳ Próxima vuelta en {i} segundos'})}\n\n"
                     yield countdown_message
                     await asyncio.sleep(1)
 
         except Exception as e:
+            print("Error en la simulación de la carrera:", e)
             yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
 
     return StreamingResponse(race_generator(), media_type="text/event-stream")
-
-
-
-
-
-
