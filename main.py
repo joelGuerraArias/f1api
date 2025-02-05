@@ -1,7 +1,6 @@
 from fastapi import FastAPI, Query
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
-import openai
 import wikipediaapi
 import random
 import asyncio
@@ -9,6 +8,7 @@ import time
 import os
 import json
 from dotenv import load_dotenv
+from openai import AsyncOpenAI
 
 # 🔹 Cargar variables de entorno
 load_dotenv()
@@ -16,10 +16,10 @@ load_dotenv()
 # 🔹 Obtener clave de OpenAI
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 if not OPENAI_API_KEY:
-    raise ValueError("❌ ERROR: No se encontró la clave de OpenAI. Verifica las variables de entorno en Railway.")
+    raise ValueError("❌ ERROR: No se encontró la clave de OpenAI. Verifica las variables de entorno.")
 
-# 🔹 Configuración de OpenAI
-openai.api_key = OPENAI_API_KEY
+# 🔹 Inicializar el cliente asíncrono de OpenAI (nueva versión)
+openai_client = AsyncOpenAI(api_key=OPENAI_API_KEY)
 
 # 🔹 Inicialización de la API FastAPI
 app = FastAPI()
@@ -27,7 +27,7 @@ app = FastAPI()
 # 🔹 Configurar CORS (ajusta para producción)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # Cambia "*" por tu dominio en producción
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -78,12 +78,12 @@ def process_pit_stops(standings, events):
     for i in range(len(standings)):
         if random.random() < 0.1:
             driver = standings[i]
-            new_pos = random.randint(5, len(standings)-1)
+            new_pos = random.randint(5, len(standings) - 1)
             standings.insert(new_pos, standings.pop(i))
             events.append(f"🛠️ {driver} entra a pits (P{i+1} → P{new_pos+1})")
 
-# 🔹 Función para generar un comentario con OpenAI
-def generate_commentary(lap, top_3, raining):
+# 🔹 Función asíncrona para generar un comentario con OpenAI
+async def generate_commentary(lap, top_3, raining):
     prompt = f"""
 Genera un comentario en español sobre la vuelta {lap} en una carrera de F1.
 El clima es {'lluvia' if raining else 'seco'}.
@@ -94,11 +94,11 @@ Los tres primeros lugares son:
 Menciona un dato interesante sobre la carrera sin repetir información básica.
     """
     try:
-        response = openai.ChatCompletion.create(
+        response = await openai_client.chat.completions.create(
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}]
         )
-        return response["choices"][0]["message"]["content"]
+        return response.choices[0].message.content
     except Exception as e:
         # Imprime el error para facilitar la depuración
         print("Error generando comentario:", e)
@@ -153,7 +153,7 @@ async def full_race_simulation():
                 process_pit_stops(standings, events)
 
                 # Generar comentario AI y obtener dato curioso de Wikipedia
-                commentary = generate_commentary(lap, standings[:3], local_weather)
+                commentary = await generate_commentary(lap, standings[:3], local_weather)
                 fact = get_pilot_fact(standings[0])
 
                 # Construcción del mensaje de salida
