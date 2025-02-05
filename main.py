@@ -105,7 +105,8 @@ def generate_commentary(lap, top_3, raining):
 
 # 🔹 Función para obtener un dato curioso de Wikipedia
 def get_pilot_fact(driver):
-    wiki = wikipediaapi.Wikipedia("es")  # Wikipedia en español
+    # Se especifica el User-Agent y el lenguaje conforme a la política de Wikipedia.
+    wiki = wikipediaapi.Wikipedia(language="es", user_agent="F1RaceSim/1.0 (autosemana@gmail.com)")
     pilot_name = driver.split("(")[0].strip()
     page = wiki.page(pilot_name)
     if page.exists():
@@ -181,6 +182,7 @@ async def full_race_simulation():
             yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
 
     return StreamingResponse(race_generator(), media_type="text/event-stream")
+
 
 
 
